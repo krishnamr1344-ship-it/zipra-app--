@@ -9,31 +9,18 @@ from passlib.context import CryptContext
 from ..database import get_db
 from ..models import User, UserRole
 from ..schemas import UserCreate, UserLogin, PhoneOtpRequest, VerifyOtpRequest, UserResponse
-from ..config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-otp_store: dict[str, dict] = {}
 
 
-def create_token(user: User) -> str:
-    payload = {
-        "sub": user.id,
-        "role": user.role.value,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-    }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-
-
-def get_user_response(user: User) -> UserResponse:
+def get_user_response(user: User, token: str = "") -> UserResponse:
     return UserResponse(
         id=user.id,
         name=user.name,
         email=user.email or "",
         phone=user.phone,
         role=user.role.value,
-        token=create_token(user),
+        token=token,
     )
 
 
@@ -49,7 +36,6 @@ def signup(data: UserCreate, db: Session = Depends(get_db)):
         name=data.name,
         email=data.email,
         phone=data.phone,
-        password_hash=pwd_context.hash(data.password),
         role=UserRole(data.role),
     )
     db.add(user)
@@ -57,43 +43,34 @@ def signup(data: UserCreate, db: Session = Depends(get_db)):
     return {"success": True, "user": get_user_response(user).model_dump()}
 
 
-@router.post("/login")
-def login(data: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == data.email).first()
-    if not user or not user.password_hash:
-        raise HTTPException(401, "Invalid credentials")
-    if not pwd_context.verify(data.password, user.password_hash):
-        raise HTTPException(401, "Invalid credentials")
-    return {"success": True, "user": get_user_response(user).model_dump()}
+@router.post("/verify-firebase")
+def verify_firebase(data: dict, db: Session = Depends(get_db)):
+    import firebase_admin.auth as firebase_auth
 
+    id_token = data.get("id_token")
+    if not id_token:
+        raise HTTPException(400, "id_token required")
 
-@router.post("/send-otp")
-def send_otp(data: PhoneOtpRequest, db: Session = Depends(get_db)):
-    phone = data.phone
-    otp = "1234"
-    otp_store[phone] = {"otp": otp, "expires": datetime.now(timezone.utc) + timedelta(minutes=5)}
-    user = db.query(User).filter(User.phone == phone).first()
-    is_new = user is None
-    return {"success": True, "otp": otp, "is_new": is_new, "message": "Use OTP: 1234 (dev mode)"}
+    try:
+        decoded = firebase_auth.verify_id_token(id_token)
+        firebase_uid = decoded["uid"]
+        phone = decoded.get("phone_number", "")
+        email = decoded.get("email", "")
+        name = decoded.get("name", "") or email or phone
 
+        user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+        if not user:
+            user = User(
+                firebase_uid=firebase_uid,
+                name=name,
+                phone=phone,
+                email=email,
+                role=UserRole.customer,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
 
-@router.post("/verify-otp")
-def verify_otp(data: VerifyOtpRequest, db: Session = Depends(get_db)):
-    phone = data.phone
-    stored = otp_store.get(phone)
-    if not stored:
-        raise HTTPException(400, "No OTP sent")
-    if stored["expires"] < datetime.now(timezone.utc):
-        raise HTTPException(400, "OTP expired")
-    if stored["otp"] != data.otp:
-        raise HTTPException(400, "Invalid OTP")
-
-    del otp_store[phone]
-    user = db.query(User).filter(User.phone == phone).first()
-    if not user:
-        user = User(name="User", phone=phone, role=UserRole.customer)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    return {"success": True, "user": get_user_response(user).model_dump()}
+        return {"success": True, "user": get_user_response(user, token=id_token).model_dump()}
+    except Exception as e:
+        raise HTTPException(401, f"Invalid Firebase token: {e}")
