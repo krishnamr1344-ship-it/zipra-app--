@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from .config import DATABASE_URL
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, connect_args={"sslmode": "require"})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
