@@ -1,10 +1,6 @@
-import 'dart:convert';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
-import '../config/api_config.dart';
-import 'api_service.dart';
 
 class PaymentService {
-  final ApiService _api = ApiService();
   Razorpay? _razorpay;
   void Function(Map<String, dynamic>)? onSuccess;
   void Function(String)? onError;

@@ -86,7 +86,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'payment_method': 'online',
       });
 
-      final orderId = res['order_id'] as String;
       final razorpayOrderId = res['razorpay_order_id'] as String;
 
       _paymentService.startPayment(
