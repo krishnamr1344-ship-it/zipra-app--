@@ -92,6 +92,18 @@ def public_config():
     return {"razorpay_key": RAZORPAY_KEY_ID}
 
 
+@app.get("/health")
+def health(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        db_ok = False
+    status = "ok" if db_ok else "degraded"
+    code = 200 if db_ok else 503
+    return JSONResponse(status_code=code, content={"status": status, "app": "Zipra API", "database": "connected" if db_ok else "down"})
+
+
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 if STATIC_DIR.exists():
@@ -105,15 +117,3 @@ if STATIC_DIR.exists():
         if index.exists():
             return FileResponse(str(index), media_type="text/html")
         return JSONResponse(status_code=404, content={"detail": "Not found"})
-
-
-@app.get("/health")
-def health(db: Session = Depends(get_db)):
-    try:
-        db.execute(text("SELECT 1"))
-        db_ok = True
-    except Exception:
-        db_ok = False
-    status = "ok" if db_ok else "degraded"
-    code = 200 if db_ok else 503
-    return JSONResponse(status_code=code, content={"status": status, "app": "Zipra API", "database": "connected" if db_ok else "down"})
