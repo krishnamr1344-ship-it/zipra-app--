@@ -95,3 +95,7 @@ class PaymentVerify(BaseModel):
     payment_id: str
     order_id: str
     signature: str
+
+
+class UserRoleUpdate(BaseModel):
+    role: str
