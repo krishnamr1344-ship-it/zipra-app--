@@ -43,7 +43,7 @@ def get_current_user(
 
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
     if not user:
-        phone = decoded.get("phone_number") or ""
+        phone = decoded.get("phone_number") or firebase_uid
         email = decoded.get("email") or None
         name = decoded.get("name") or email or phone
         user = User(

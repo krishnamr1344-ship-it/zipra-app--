@@ -56,7 +56,7 @@ def verify_firebase(data: dict, db: Session = Depends(get_db)):
         get_firebase_app()
         decoded = firebase_auth.verify_id_token(id_token)
         firebase_uid = decoded["uid"]
-        phone = decoded.get("phone_number", "") or ""
+        phone = decoded.get("phone_number") or firebase_uid
         email = decoded.get("email") or None
         name = decoded.get("name") or email or phone
 
