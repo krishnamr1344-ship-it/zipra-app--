@@ -1,0 +1,36 @@
+"""add_stock_quantity_to_products
+
+Revision ID: c53b9a3f7d21
+Revises:
+Create Date: 2026-07-05 13:00:00.000000
+
+"""
+
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+revision: str = "c53b9a3f7d21"
+down_revision: Union[str, Sequence[str], None] = None
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='products' AND column_name='stock_quantity'
+            ) THEN
+                ALTER TABLE products ADD COLUMN stock_quantity INTEGER NOT NULL DEFAULT 0;
+            END IF;
+        END $$;
+    """)
+
+
+def downgrade() -> None:
+    op.execute("ALTER TABLE products DROP COLUMN IF EXISTS stock_quantity")

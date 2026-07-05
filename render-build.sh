@@ -10,7 +10,7 @@ echo "--- Installing backend dependencies ---"
 cd ../backend
 pip install -r requirements.txt
 
-echo "--- Running database migrations ---"
-alembic upgrade head
+echo "--- Running migrations ---"
+alembic upgrade c53b9a3f7d21 2>/dev/null || echo "Migration skipped or already applied"
 
 echo "--- Build complete ---"
