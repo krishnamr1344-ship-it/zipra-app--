@@ -1,4 +1,5 @@
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import '../config/api_config.dart';
 
 class PaymentService {
   Razorpay? _razorpay;
@@ -25,7 +26,7 @@ class PaymentService {
     required String name,
   }) async {
     final options = {
-      'key': 'rzp_live_YOUR_KEY_HERE',
+      'key': ApiConfig.razorpayKey,
       'amount': (amount * 100).toInt(),
       'name': 'Zipra',
       'description': 'Order Payment',

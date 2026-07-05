@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from jose import jwt
 from passlib.context import CryptContext
 
+from ..dependencies import get_firebase_app
 from ..database import get_db
 from ..models import User, UserRole
 from ..schemas import UserCreate, UserLogin, PhoneOtpRequest, VerifyOtpRequest, UserResponse
@@ -52,6 +53,7 @@ def verify_firebase(data: dict, db: Session = Depends(get_db)):
         raise HTTPException(400, "id_token required")
 
     try:
+        get_firebase_app()
         decoded = firebase_auth.verify_id_token(id_token)
         firebase_uid = decoded["uid"]
         phone = decoded.get("phone_number", "")
