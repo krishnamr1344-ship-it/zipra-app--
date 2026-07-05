@@ -2,7 +2,7 @@ import os
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres.gnoypcoithdbbishbyby:Ffiey6iZc78%24GVS@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require"
+    "postgresql://postgres.gnoypcoithdbbishbyby:Ffiey6iZc78%24GVS@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?sslmode=require"
 )
 SECRET_KEY = os.getenv("SECRET_KEY", "zipra-prod-secret-key-2026")
 ALGORITHM = "HS256"
