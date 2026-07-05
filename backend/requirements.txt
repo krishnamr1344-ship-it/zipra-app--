@@ -8,4 +8,5 @@ alembic>=1.13.2,<1.14
 gunicorn>=22.0.0,<23
 firebase-admin>=6.6.0,<7
 razorpay>=1.4.0,<2
+setuptools>=75.0.0,<76
 slowapi>=0.1.9,<0.2
