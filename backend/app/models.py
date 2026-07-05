@@ -34,6 +34,7 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(100), unique=True, nullable=True)
     phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    firebase_uid: Mapped[str] = mapped_column(String, unique=True, nullable=True)
     password_hash: Mapped[str] = mapped_column(String(200), nullable=True)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.customer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
