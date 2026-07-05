@@ -7,8 +7,8 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from slowapi import _rate_limit_exceeded_handler
-from slowapi.middleware import LimiterMiddleware
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -73,7 +73,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(LimiterMiddleware, limiter=limiter)
+app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
