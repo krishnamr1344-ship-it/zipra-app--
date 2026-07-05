@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Product, User, UserRole
-from ..schemas import ProductCreate, ProductResponse
+from ..schemas import ProductCreate, ProductUpdate, ProductResponse
 from ..dependencies import get_current_user
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -12,13 +12,21 @@ router = APIRouter(prefix="/products", tags=["products"])
 @router.get("")
 def list_products(
     category: str = "",
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     query = db.query(Product).filter(Product.is_available == True)
     if category:
         query = query.filter(Product.category == category)
-    products = query.order_by(Product.created_at.desc()).all()
-    return {"products": [ProductResponse.model_validate(p).model_dump() for p in products]}
+    total = query.count()
+    products = query.order_by(Product.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    return {
+        "products": [ProductResponse.model_validate(p).model_dump() for p in products],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+    }
 
 
 @router.post("")
@@ -29,6 +37,8 @@ def create_product(
 ):
     if user.role not in [UserRole.shop_owner, UserRole.admin]:
         raise HTTPException(403, "Only shop owners can create products")
+    if data.price <= 0:
+        raise HTTPException(400, "Price must be greater than zero")
 
     product = Product(
         shop_owner_id=user.id,
@@ -37,6 +47,7 @@ def create_product(
         price=data.price,
         image_url=data.image_url,
         category=data.category,
+        stock_quantity=data.stock_quantity,
     )
     db.add(product)
     db.commit()
@@ -44,10 +55,10 @@ def create_product(
     return {"product": ProductResponse.model_validate(product).model_dump()}
 
 
-@router.put("/{product_id}")
+@router.patch("/{product_id}")
 def update_product(
     product_id: str,
-    data: ProductCreate,
+    data: ProductUpdate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -57,8 +68,18 @@ def update_product(
     if product.shop_owner_id != user.id and user.role != UserRole.admin:
         raise HTTPException(403, "Not your product")
 
-    for key, val in data.model_dump().items():
-        setattr(product, key, val)
+    if data.name is not None:
+        product.name = data.name
+    if data.description is not None:
+        product.description = data.description
+    if data.price is not None:
+        product.price = data.price
+    if data.image_url is not None:
+        product.image_url = data.image_url
+    if data.category is not None:
+        product.category = data.category
+    if data.stock_quantity is not None:
+        product.stock_quantity = data.stock_quantity
     db.commit()
     return {"product": ProductResponse.model_validate(product).model_dump()}
 

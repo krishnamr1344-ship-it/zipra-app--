@@ -1,35 +1,13 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from datetime import datetime
-
-
-class UserCreate(BaseModel):
-    name: str
-    email: Optional[str] = None
-    phone: str
-    password: str
-    role: str = "customer"
-
-
-class UserLogin(BaseModel):
-    email: str
-    password: str
-
-
-class PhoneOtpRequest(BaseModel):
-    phone: str
-
-
-class VerifyOtpRequest(BaseModel):
-    phone: str
-    otp: str
 
 
 class UserResponse(BaseModel):
     id: str
     name: str
     email: Optional[str] = None
-    phone: str
+    phone: Optional[str] = None
     role: str
     token: str
 
@@ -40,6 +18,30 @@ class ProductCreate(BaseModel):
     price: float
     image_url: str = ""
     category: str = "General"
+    stock_quantity: int = 0
+
+    @field_validator("price")
+    @classmethod
+    def price_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError("Price must be greater than zero")
+        return v
+
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    image_url: Optional[str] = None
+    category: Optional[str] = None
+    stock_quantity: Optional[int] = None
+
+    @field_validator("price")
+    @classmethod
+    def price_must_be_positive(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("Price must be greater than zero")
+        return v
 
 
 class ProductResponse(BaseModel):
@@ -50,6 +52,7 @@ class ProductResponse(BaseModel):
     image_url: str
     category: str
     is_available: bool
+    stock_quantity: int
 
     model_config = {"from_attributes": True}
 
@@ -57,17 +60,23 @@ class ProductResponse(BaseModel):
 class OrderItemCreate(BaseModel):
     product_id: str
     quantity: int
-    price: float
+
+    @field_validator("quantity")
+    @classmethod
+    def quantity_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError("Quantity must be greater than zero")
+        return v
 
 
 class OrderCreate(BaseModel):
     items: list[OrderItemCreate]
-    total_amount: float
     delivery_address: str
     payment_method: str = "online"
 
 
 class OrderItemResponse(BaseModel):
+    product_id: Optional[str] = None
     product_name: str
     quantity: int
     price: float
@@ -93,7 +102,6 @@ class OrderStatusUpdate(BaseModel):
 
 class PaymentVerify(BaseModel):
     payment_id: str
-    order_id: str
     signature: str
 
 

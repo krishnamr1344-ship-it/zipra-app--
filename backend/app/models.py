@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Float, Integer, Boolean, Text, DateTime, ForeignKey, Enum
+from sqlalchemy import String, Integer, Boolean, Text, DateTime, ForeignKey, Enum, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
@@ -19,6 +19,7 @@ class UserRole(str, enum.Enum):
 
 
 class OrderStatus(str, enum.Enum):
+    # Must stay in sync with the CHECK constraint in schema.sql
     placed = "placed"
     accepted = "accepted"
     preparing = "preparing"
@@ -33,11 +34,11 @@ class User(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(100), unique=True, nullable=True)
-    phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    phone: Mapped[str] = mapped_column(String(100), unique=True, nullable=True)
     firebase_uid: Mapped[str] = mapped_column(String, unique=True, nullable=True)
-    password_hash: Mapped[str] = mapped_column(String(200), nullable=True)
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.customer)
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.customer, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     products = relationship("Product", back_populates="shop_owner")
     orders = relationship("Order", back_populates="customer")
@@ -47,14 +48,16 @@ class Product(Base):
     __tablename__ = "products"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
-    shop_owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    shop_owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
-    price: Mapped[float] = mapped_column(Float, nullable=False)
-    image_url: Mapped[str] = mapped_column(String(500), default="")
+    price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    image_url: Mapped[str] = mapped_column(String(2048), default="")
     category: Mapped[str] = mapped_column(String(100), default="General")
-    is_available: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_available: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    stock_quantity: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     shop_owner = relationship("User", back_populates="products")
 
@@ -63,11 +66,13 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
-    customer_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    customer_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), default=OrderStatus.placed)
-    total_amount: Mapped[float] = mapped_column(Float, nullable=False)
+    total_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     delivery_address: Mapped[str] = mapped_column(Text, nullable=False)
     payment_id: Mapped[str] = mapped_column(String(200), default="")
+    razorpay_order_id: Mapped[str] = mapped_column(String(200), default="")
+    idempotency_key: Mapped[str] = mapped_column(String(200), default="", index=True)
     payment_method: Mapped[str] = mapped_column(String(50), default="online")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -81,19 +86,21 @@ class OrderItem(Base):
     __tablename__ = "order_items"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
-    order_id: Mapped[str] = mapped_column(String, ForeignKey("orders.id"), nullable=False)
+    order_id: Mapped[str] = mapped_column(String, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    product_id: Mapped[str] = mapped_column(String, ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
     product_name: Mapped[str] = mapped_column(String(200), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
-    price: Mapped[float] = mapped_column(Float, nullable=False)
+    price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
 
     order = relationship("Order", back_populates="items")
+    product = relationship("Product")
 
 
 class OrderStatusHistory(Base):
     __tablename__ = "order_status_history"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
-    order_id: Mapped[str] = mapped_column(String, ForeignKey("orders.id"), nullable=False)
+    order_id: Mapped[str] = mapped_column(String, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
