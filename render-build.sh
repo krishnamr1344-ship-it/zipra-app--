@@ -10,4 +10,7 @@ echo "--- Installing backend dependencies ---"
 cd ../backend
 pip install -r requirements.txt
 
+echo "--- Running database migrations ---"
+alembic upgrade head
+
 echo "--- Build complete ---"
