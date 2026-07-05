@@ -1,4 +1,4 @@
-"""add_missing_columns_to_products
+"""add_stock_quantity_to_products
 
 Revision ID: c53b9a3f7d21
 Revises:
@@ -30,19 +30,7 @@ def upgrade() -> None:
             END IF;
         END $$;
     """)
-    op.execute("""
-        DO $$
-        BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.columns
-                WHERE table_name='products' AND column_name='updated_at'
-            ) THEN
-                ALTER TABLE products ADD COLUMN updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
-            END IF;
-        END $$;
-    """)
 
 
 def downgrade() -> None:
     op.execute("ALTER TABLE products DROP COLUMN IF EXISTS stock_quantity")
-    op.execute("ALTER TABLE products DROP COLUMN IF EXISTS updated_at")

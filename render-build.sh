@@ -11,6 +11,6 @@ cd ../backend
 pip install -r requirements.txt
 
 echo "--- Running migrations ---"
-alembic upgrade c53b9a3f7d21 2>/dev/null || echo "Migration skipped or already applied"
+alembic upgrade ab12cd34ef56 2>/dev/null || echo "Migration skipped or already applied"
 
 echo "--- Build complete ---"
