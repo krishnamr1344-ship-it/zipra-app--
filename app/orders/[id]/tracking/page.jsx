@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/providers/toast-provider";
 
-const STEPS = ["PLACED", "CONFIRMED", "PACKED", "OUT_FOR_DELIVERY", "DELIVERED"];
+const STEPS = ["placed", "confirmed", "out_for_delivery", "delivered"];
 
 export default function OrderTrackingPage() {
   const { id } = useParams();
@@ -53,8 +53,8 @@ export default function OrderTrackingPage() {
 
   const status = ORDER_STATUS[order.status];
   const currentStep = STEPS.indexOf(order.status);
-  const delivered = order.status === "DELIVERED";
-  const active = !delivered && order.status !== "CANCELLED";
+  const delivered = order.status === "delivered";
+  const active = !delivered && order.status !== "cancelled";
 
   return (
     <div className="space-y-4 pb-24">

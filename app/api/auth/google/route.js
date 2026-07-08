@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 
 export async function POST(request) {
   try {
-    const { idToken } = await request.json();
+    const { idToken, refreshToken } = await request.json();
 
     if (!idToken) {
       return NextResponse.json(
@@ -38,6 +38,7 @@ export async function POST(request) {
       uid: userInfo.localId,
       email: userInfo.email,
       token: idToken,
+      refreshToken: refreshToken || "",
       createdAt: Date.now(),
     };
 

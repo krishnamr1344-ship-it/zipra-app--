@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Plus, CreditCard, Wallet, Banknote, Check } from "lucide-react";
+import { MapPin, Plus, CreditCard, Banknote, Check, AlertTriangle } from "lucide-react";
 import { useStore } from "@/store/useStore";
 import { services, ordersService } from "@/services/api";
-import { PAYMENT_METHODS, DELIVERY } from "@/constants/app";
+import { PAYMENT_METHODS } from "@/constants/app";
 import { formatPrice } from "@/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,6 +27,8 @@ export default function CheckoutPage() {
   const [payment, setPayment] = React.useState("razorpay");
   const [instructions, setInstructions] = React.useState("");
   const [placing, setPlacing] = React.useState(false);
+  const [zoneInfo, setZoneInfo] = React.useState(null);
+  const [zoneLoading, setZoneLoading] = React.useState(false);
 
   React.useEffect(() => {
     services.addresses.list().then((a) => {
@@ -34,6 +36,19 @@ export default function CheckoutPage() {
       setAddress(a.find((x) => x.isDefault) || a[0]);
     });
   }, []);
+
+  React.useEffect(() => {
+    if (!address?.latitude || !address?.longitude) {
+      setZoneInfo(null);
+      return;
+    }
+    setZoneLoading(true);
+    services.deliveryZones
+      .check(address.latitude, address.longitude)
+      .then((result) => setZoneInfo(result))
+      .catch(() => setZoneInfo(null))
+      .finally(() => setZoneLoading(false));
+  }, [address]);
 
   if (cart.length === 0)
     return (
@@ -45,7 +60,14 @@ export default function CheckoutPage() {
       />
     );
 
-  const deliveryFee = subtotal >= DELIVERY.freeAbove ? 0 : DELIVERY.fee;
+  const zone = zoneInfo?.zone;
+  const inZone = zoneInfo?.in_zone;
+  const deliveryFee =
+    zone && subtotal >= zone.free_delivery_above
+      ? 0
+      : zone
+        ? zone.delivery_fee
+        : 0;
   const total = subtotal + deliveryFee;
 
   const placeOrder = async () => {
@@ -53,11 +75,15 @@ export default function CheckoutPage() {
       toast({ variant: "error", title: "Select a delivery address" });
       return;
     }
+    if (!inZone) {
+      toast({ variant: "error", title: "Delivery unavailable", description: "We don't deliver to this area yet." });
+      return;
+    }
     setPlacing(true);
     try {
       const order = await ordersService.create({
         addressId: address.id,
-        paymentMethod: "razorpay",
+        paymentMethod: payment,
       });
       setPlacing(false);
       router.push(`/payment?order=${order.id}`);
@@ -94,6 +120,19 @@ export default function CheckoutPage() {
                 {address.name}, {address.line1}, {address.line2}, {address.city} -{" "}
                 {address.pincode}
               </p>
+              {zoneLoading && (
+                <p className="mt-1 text-xs text-muted-foreground">Checking delivery availability…</p>
+              )}
+              {!zoneLoading && inZone === false && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-destructive">
+                  <AlertTriangle className="h-3 w-3" /> We don&apos;t deliver to this area yet
+                </p>
+              )}
+              {!zoneLoading && zone && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Delivery from {zone.name}
+                </p>
+              )}
             </div>
           </Card>
         ) : (
@@ -126,7 +165,6 @@ export default function CheckoutPage() {
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground">
                 {m.icon === "cash" && <Banknote className="h-5 w-5" />}
                 {m.icon === "card" && <CreditCard className="h-5 w-5" />}
-                {m.icon === "wallet" && <Wallet className="h-5 w-5" />}
               </span>
               <span className="flex-1">
                 <span className="block text-sm font-semibold">{m.label}</span>
@@ -151,9 +189,9 @@ export default function CheckoutPage() {
           <span className="font-medium text-foreground">{formatPrice(subtotal)}</span>
         </div>
         <div className="flex justify-between text-sm text-muted-foreground">
-          <span>Delivery fee</span>
+          <span>Delivery fee {zone ? `(${zone.name})` : ""}</span>
           <span className="font-medium text-foreground">
-            {deliveryFee === 0 ? "FREE" : formatPrice(deliveryFee)}
+            {!inZone ? "—" : deliveryFee === 0 ? "FREE" : formatPrice(deliveryFee)}
           </span>
         </div>
         <div className="my-1 border-t border-border" />
@@ -169,7 +207,7 @@ export default function CheckoutPage() {
             fullWidth
             variant="gradient"
             size="lg"
-            disabled={placing}
+            disabled={placing || inZone === false}
             onClick={placeOrder}
           >
             {placing ? "Placing order…" : `Place Order · ${formatPrice(total)}`}

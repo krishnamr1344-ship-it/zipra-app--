@@ -24,11 +24,19 @@ export function mapProduct(p) {
     discount_percent: pct,
     badge: pct > 0 ? `${pct}% OFF` : p.badge || null,
     tags: [],
+    variants: Array.isArray(p.variants)
+      ? p.variants.map((v) => ({
+          id: v.id,
+          name: v.name,
+          price: v.price != null ? Number(v.price) : null,
+          stock: v.stock || 0,
+        }))
+      : [],
   };
 }
 
 export function mapProducts(list) {
-  const arr = Array.isArray(list) ? list : list?.items || list?.data || [];
+  const arr = Array.isArray(list) ? list : list?.items || list?.products || list?.data || [];
   return arr.map(mapProduct).filter(Boolean);
 }
 
@@ -174,6 +182,8 @@ export function mapAddress(a) {
     pincode: a.pincode || "",
     isDefault: !!a.is_default,
     phone: a.phone || "",
+    latitude: a.latitude ?? null,
+    longitude: a.longitude ?? null,
   };
 }
 

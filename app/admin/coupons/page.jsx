@@ -13,24 +13,12 @@ export default function AdminCouponsPage() {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    api_list()
+    services.coupons
+      .list()
       .then(setList)
       .catch(() => setList([]))
       .finally(() => setLoading(false));
   }, []);
-
-  async function api_list() {
-    const { data } = await (await import("@/services/api")).default.get("/admin/combo-packs");
-    const arr = Array.isArray(data) ? data : data?.items || data?.data || [];
-    return arr.map((c) => ({
-      id: c.id,
-      code: c.code || c.name || "COMBO",
-      title: c.name || "Combo Pack",
-      desc: c.description || "Curated combo",
-      discount: c.discount_percent ? `${c.discount_percent}%` : "Offer",
-      status: c.is_active ? "Active" : "Expired",
-    }));
-  }
 
   return (
     <div className="space-y-5">

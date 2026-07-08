@@ -10,8 +10,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/empty-state";
 import { Reveal } from "@/components/layout/reveal";
 import { PullToRefresh } from "@/components/layout/pull-to-refresh";
+import { WeatherWidget } from "@/components/weather/weather-widget";
+import { useAuth } from "@/lib/firebase";
 
 export default function HomePage() {
+  const { user } = useAuth();
   const [banners, setBanners] = React.useState([]);
   const [products, setProducts] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -41,15 +44,21 @@ export default function HomePage() {
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const name = user?.displayName || "";
 
   return (
     <PullToRefresh onRefresh={load}>
       <div className="space-y-7">
         <div className="animate-fade-in">
-          <p className="text-sm text-muted-foreground">{greeting}, Mohan 👋</p>
-          <h1 className="font-display text-2xl font-bold tracking-tight">
-            What are you cooking today?
-          </h1>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-muted-foreground">{greeting}{name ? `, ${name}` : ""} 👋</p>
+              <h1 className="font-display text-2xl font-bold tracking-tight">
+                What are you cooking today?
+              </h1>
+            </div>
+            <WeatherWidget />
+          </div>
         </div>
 
         {loading ? (

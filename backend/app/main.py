@@ -3,7 +3,8 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request
+import httpx
+from fastapi import Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -16,7 +17,7 @@ from starlette.responses import Response
 
 from .database import get_db
 from .dependencies import limiter
-from .routes import auth, products, orders, admin
+from .routes import auth, products, orders, admin, cart, wishlist, addresses, notifications, banners, categories, coupons, delivery_zones, payments, profile, admin_stats, upload
 from .config import RAZORPAY_KEY_ID
 
 
@@ -79,6 +80,18 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(cart.router, prefix="/api")
+app.include_router(wishlist.router, prefix="/api")
+app.include_router(addresses.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
+app.include_router(banners.router, prefix="/api")
+app.include_router(categories.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
+app.include_router(profile.router, prefix="/api")
+app.include_router(admin_stats.router, prefix="/api")
+app.include_router(coupons.router, prefix="/api")
+app.include_router(delivery_zones.router, prefix="/api")
+app.include_router(upload.router, prefix="/api")
 
 
 @app.exception_handler(Exception)
@@ -90,6 +103,38 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/api/config")
 def public_config():
     return {"razorpay_key": RAZORPAY_KEY_ID}
+
+
+NOMINATIM_BASE = "https://nominatim.openstreetmap.org"
+NOMINATIM_HEADERS = {"User-Agent": "ZipraApp/1.0 (support@zipra.app)"}
+
+
+@app.get("/api/geocode/reverse")
+async def geocode_reverse(lat: float = Query(...), lon: float = Query(...)):
+    async with httpx.AsyncClient() as client:
+        res = await client.get(
+            f"{NOMINATIM_BASE}/reverse",
+            params={"lat": lat, "lon": lon, "format": "json", "addressdetails": 1, "limit": 1},
+            headers=NOMINATIM_HEADERS,
+            timeout=10,
+        )
+        if res.status_code != 200:
+            return JSONResponse(status_code=502, content={"detail": "Geocode failed"})
+        return res.json()
+
+
+@app.get("/api/geocode/search")
+async def geocode_search(q: str = Query(...), limit: int = Query(6, le=10)):
+    async with httpx.AsyncClient() as client:
+        res = await client.get(
+            f"{NOMINATIM_BASE}/search",
+            params={"q": q, "format": "json", "addressdetails": 1, "limit": limit, "countrycodes": "in"},
+            headers=NOMINATIM_HEADERS,
+            timeout=10,
+        )
+        if res.status_code != 200:
+            return JSONResponse(status_code=502, content={"detail": "Search failed"})
+        return res.json()
 
 
 @app.get("/health")

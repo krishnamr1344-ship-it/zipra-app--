@@ -1,3 +1,13 @@
+-- ===========================================================================
+-- LEGACY / REFERENCE ONLY — NOT USED BY THE APPLICATION
+-- ---------------------------------------------------------------------------
+-- The live database schema is managed exclusively by Alembic migrations
+-- (see backend/alembic/). This file is a stale, hand-written snapshot that
+-- DIVERGES from the actual SQLAlchemy models (backend/app/models.py) and must
+-- NOT be used to create or migrate the database. It is kept only as a rough
+-- reference and will be removed during the production cleanup audit.
+-- ===========================================================================
+
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -18,6 +28,10 @@ CREATE TABLE IF NOT EXISTS products (
     description TEXT NOT NULL DEFAULT '',
     price DECIMAL(10,2) NOT NULL,
     image_url TEXT NOT NULL DEFAULT '',
+    mrp DECIMAL(10,2) NOT NULL DEFAULT 0,
+    unit VARCHAR(50) NOT NULL DEFAULT '',
+    rating DECIMAL(3,2) NOT NULL DEFAULT 0,
+    images JSONB NOT NULL DEFAULT '[]'::jsonb,
     category TEXT NOT NULL DEFAULT 'General',
     is_available BOOLEAN NOT NULL DEFAULT TRUE,
     stock_quantity INTEGER NOT NULL DEFAULT 0,
@@ -69,6 +83,98 @@ CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id);
 CREATE INDEX IF NOT EXISTS idx_order_status_history_order ON order_status_history(order_id);
 -- firebase_uid and phone are already indexed via UNIQUE constraint
 CREATE INDEX IF NOT EXISTS idx_orders_idempotency ON orders(idempotency_key);
+
+-- Cart items table
+CREATE TABLE IF NOT EXISTS cart_items (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Wishlists table
+CREATE TABLE IF NOT EXISTS wishlists (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, product_id)
+);
+
+-- Addresses table
+CREATE TABLE IF NOT EXISTS addresses (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    label TEXT NOT NULL DEFAULT 'Home',
+    name TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    address_line1 TEXT NOT NULL,
+    address_line2 TEXT NOT NULL DEFAULT '',
+    landmark TEXT NOT NULL DEFAULT '',
+    city TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT '',
+    pincode TEXT NOT NULL,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL DEFAULT 'info',
+    title TEXT NOT NULL,
+    message TEXT NOT NULL DEFAULT '',
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Banners table
+CREATE TABLE IF NOT EXISTS banners (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    title TEXT NOT NULL,
+    subtitle TEXT NOT NULL DEFAULT '',
+    cta TEXT NOT NULL DEFAULT 'Shop Now',
+    link TEXT NOT NULL DEFAULT '',
+    image_url TEXT NOT NULL DEFAULT '',
+    color TEXT NOT NULL DEFAULT 'from-[#FF9A3D] to-[#F26400]',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Categories table
+CREATE TABLE IF NOT EXISTS categories (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    name TEXT NOT NULL UNIQUE,
+    image TEXT NOT NULL DEFAULT '',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for new tables
+CREATE INDEX IF NOT EXISTS idx_cart_items_user ON cart_items(user_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_product ON cart_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_wishlists_user ON wishlists(user_id);
+CREATE INDEX IF NOT EXISTS idx_wishlists_product ON wishlists(product_id);
+CREATE INDEX IF NOT EXISTS idx_addresses_user ON addresses(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
+
+-- Triggers for new tables
+DROP TRIGGER IF EXISTS trigger_update_cart_items ON cart_items;
+CREATE TRIGGER trigger_update_cart_items
+    BEFORE UPDATE ON cart_items
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+DROP TRIGGER IF EXISTS trigger_update_addresses ON addresses;
+CREATE TRIGGER trigger_update_addresses
+    BEFORE UPDATE ON addresses
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
 
 -- Function to auto-update updated_at
 CREATE OR REPLACE FUNCTION update_updated_at()

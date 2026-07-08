@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import User, UserRole
-from ..schemas import UserRoleUpdate
+from ..schemas import UserRoleUpdate, SettingsResponse, SettingsUpdate
 from ..dependencies import get_current_user
+from ..settings import get_low_stock_threshold, set_low_stock_threshold
 
 logger = logging.getLogger("zipra.admin")
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -19,9 +20,9 @@ def list_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
 ):
-    if user.role != UserRole.admin:
+    if user.role != "admin":
         raise HTTPException(403, "Admin only")
-    query = db.query(User)
+    query = db.query(User).filter(User.is_deleted == False)
     total = query.count()
     users = query.order_by(User.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
     return {
@@ -31,7 +32,7 @@ def list_users(
                 "name": u.name,
                 "email": u.email,
                 "phone": u.phone,
-                "role": u.role.value,
+                "role": u.role,
                 "created_at": u.created_at.isoformat(),
             }
             for u in users
@@ -49,28 +50,26 @@ def update_user_role(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    if user.role != UserRole.admin:
+    if user.role != "admin":
         raise HTTPException(403, "Admin only")
 
-    try:
-        new_role = UserRole(data.role)
-    except ValueError:
-        raise HTTPException(400, f"Invalid role. Must be one of: {', '.join(r.value for r in UserRole)}")
+    if data.role not in ("customer", "shop_owner", "admin"):
+        raise HTTPException(400, "Invalid role. Must be one of: customer, shop_owner, admin")
 
-    target = db.query(User).filter(User.id == user_id).first()
+    target = db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
     if not target:
         raise HTTPException(404, "User not found")
 
-    if target.id == user.id and new_role != UserRole.admin:
+    if target.id == user.id and data.role != "admin":
         raise HTTPException(400, "You cannot demote yourself from admin")
 
-    target.role = new_role
+    target.role = data.role
     db.commit()
     db.refresh(target)
 
     logger.info(
         "Role changed",
-        extra={"target_user": target.id, "new_role": new_role.value, "changed_by": user.id},
+        extra={"target_user": target.id, "new_role": data.role, "changed_by": user.id},
     )
 
     return {
@@ -80,6 +79,28 @@ def update_user_role(
             "name": target.name,
             "email": target.email,
             "phone": target.phone,
-            "role": target.role.value,
+            "role": target.role,
         },
     }
+
+
+@router.get("/settings", response_model=SettingsResponse)
+def get_settings(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != "admin":
+        raise HTTPException(403, "Admin only")
+    return SettingsResponse(low_stock_threshold=get_low_stock_threshold(db))
+
+
+@router.patch("/settings", response_model=SettingsResponse)
+def update_settings(
+    data: SettingsUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != "admin":
+        raise HTTPException(403, "Admin only")
+    threshold = set_low_stock_threshold(db, data.low_stock_threshold)
+    return SettingsResponse(low_stock_threshold=threshold)

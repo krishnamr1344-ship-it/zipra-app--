@@ -12,6 +12,7 @@ const Avatar = React.forwardRef(
       {...props}
     >
       {src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- avatar src is an arbitrary remote (Firebase/Google) URL
         <img
           src={src}
           alt={alt}

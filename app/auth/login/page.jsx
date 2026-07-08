@@ -1,16 +1,14 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Mail, Lock, Smartphone } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import Link from "next/link";
+import { Cloud, Sun, CloudRain, Snowflake, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { useToast } from "@/components/providers/toast-provider";
-import { authService } from "@/services/api";
 import { useStore } from "@/store/useStore";
-import { signInWithGoogle } from "@/lib/firebase";
+import { useAuth } from "@/lib/firebase";
 import api from "@/services/api";
 
 const GoogleIcon = () => (
@@ -22,51 +20,83 @@ const GoogleIcon = () => (
   </svg>
 );
 
+function WeatherWidget() {
+  const [weather, setWeather] = React.useState(null);
+  const [error, setError] = React.useState(false);
+
+  React.useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const res = await fetch(
+              `https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current_weather=true`
+            );
+            const data = await res.json();
+            setWeather(data.current_weather);
+          } catch {
+            setError(true);
+          }
+        },
+        () => {
+          fetch(
+            "https://api.open-meteo.com/v1/forecast?latitude=19.076&longitude=72.8777&current_weather=true"
+          )
+            .then((r) => r.json())
+            .then((d) => setWeather(d.current_weather))
+            .catch(() => setError(true));
+        },
+        { timeout: 5000 }
+      );
+    } else {
+      setError(true);
+    }
+  }, []);
+
+  if (error) return null;
+  if (!weather) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+
+  const code = weather.weathercode || 0;
+  const temp = Math.round(weather.temperature);
+  let Icon = Sun;
+  if (code >= 61 && code <= 67) Icon = CloudRain;
+  else if (code >= 71 && code <= 77) Icon = Snowflake;
+  else if (code >= 51 && code <= 55) Icon = CloudRain;
+  else if (code >= 80 && code <= 82) Icon = CloudRain;
+  else if (code >= 95) Icon = CloudRain;
+  else if (code >= 2 && code <= 48) Icon = Cloud;
+
+  return (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Icon className="h-5 w-5 text-[#FF7A00]" />
+      <span>{temp}°C right now</span>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") || "/";
   const { toast } = useToast();
   const syncFromBackend = useStore((s) => s.syncFromBackend);
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
+  const { loginWithGoogle } = useAuth();
   const [googleLoading, setGoogleLoading] = React.useState(false);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!email.trim() || !password.trim()) {
-      toast({ variant: "error", title: "Enter email and password" });
-      return;
-    }
-    setLoading(true);
-    try {
-      await authService.login(email.trim(), password);
-      await syncFromBackend();
-      toast({ variant: "success", title: "Welcome back to Zipra!" });
-      router.push(redirect);
-    } catch (err) {
-      const msg = err?.response?.data?.error || err?.response?.data?.detail || err.message || "Login failed";
-      toast({ variant: "error", title: "Login failed", description: msg });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      const { credential } = await signInWithGoogle();
-
-      // Send the Google ID token to the backend API to set session cookie
-      await api.post("/auth/google", { idToken: credential.token });
-
+      const result = await loginWithGoogle();
+      const token = result?.credential?.token;
+      if (token) {
+        await api.post("/auth/verify-firebase", { id_token: token });
+      }
       await syncFromBackend();
-      toast({ variant: "success", title: "Signed in with Google!" });
+      toast({ variant: "success", title: "Welcome to Zipra!" });
       router.push(redirect);
     } catch (err) {
       if (err.message !== "Popup closed" && err.message !== "Sign-in popup was closed.") {
-        toast({ variant: "error", title: "Google sign-in failed", description: err.message });
+        toast({ variant: "error", title: "Sign-in failed", description: err.message });
       }
     } finally {
       setGoogleLoading(false);
@@ -78,84 +108,37 @@ export default function LoginPage() {
       <div className="flex flex-1 flex-col justify-center px-6 py-10">
         <div className="mb-8 animate-fade-in">
           <Logo />
-          <h1 className="mt-6 font-display text-2xl font-bold tracking-tight">
-            Sign in to Zipra
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Fresh groceries delivered in minutes.
-          </p>
+          <div className="mt-6">
+            <WeatherWidget />
+          </div>
         </div>
 
-        <form onSubmit={submit} className="space-y-4 animate-slide-up">
-          <div className="relative">
-            <Mail className="absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email address"
-              type="email"
-              autoComplete="email"
-              className="h-12 rounded-2xl pl-11"
-            />
-          </div>
-          <div className="relative">
-            <Lock className="absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              className="h-12 rounded-2xl pl-11"
-            />
-          </div>
-
-          <Button
-            type="submit"
-            fullWidth
-            size="lg"
-            variant="gradient"
-            disabled={loading}
-            className="rounded-2xl"
+        <div className="animate-slide-up space-y-4">
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={googleLoading}
+            className="flex w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card py-3.5 text-sm font-semibold shadow-sm transition hover:bg-muted disabled:opacity-50"
           >
-            {loading ? "Signing in\u2026" : "Sign In"} <ArrowRight className="h-4 w-4" />
-          </Button>
-        </form>
-
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-gradient-to-b from-[#FFF3E8] to-background px-2 text-muted-foreground">or</span>
-          </div>
+            {googleLoading ? (
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-[#FF7A00]" />
+            ) : (
+              <GoogleIcon />
+            )}
+            {googleLoading ? "Signing in\u2026" : "Continue with Google"}
+          </button>
         </div>
 
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          disabled={googleLoading}
-          className="flex w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card py-3.5 text-sm font-semibold shadow-sm transition hover:bg-muted disabled:opacity-50"
-        >
-          {googleLoading ? (
-            <span className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-[#FF7A00]" />
-          ) : (
-            <GoogleIcon />
-          )}
-          {googleLoading ? "Signing in\u2026" : "Continue with Google"}
-        </button>
-
-        <button
-          onClick={() => router.push("/auth/otp")}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3.5 text-sm font-semibold transition hover:bg-muted"
-        >
-          <Smartphone className="h-4 w-4 text-[#FF7A00]" /> Continue with OTP
-        </button>
-
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          New to Zipra?{" "}
-          <Link href="/auth/register" className="font-semibold text-[#FF7A00]">
-            Create account
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          By continuing, you agree to our{" "}
+          <Link href="/terms" className="font-medium text-[#FF7A00] underline underline-offset-2">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="font-medium text-[#FF7A00] underline underline-offset-2">
+            Privacy Policy
           </Link>
+          .
         </p>
       </div>
     </div>

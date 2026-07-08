@@ -20,6 +20,7 @@ import {
   Receipt,
   TrendingUp,
   ArrowUpRight,
+  AlertTriangle,
 } from "lucide-react";
 import { services } from "@/services/api";
 import { formatPrice } from "@/utils";
@@ -86,6 +87,31 @@ export default function AdminPage() {
           </Card>
         ))}
       </div>
+
+      {(num(d.low_stock_count) > 0 || num(d.out_of_stock_count) > 0) && (
+        <Card className="flex items-start gap-3 border-destructive/40 bg-destructive/5 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-destructive">Inventory attention required</p>
+            <p className="text-sm text-muted-foreground">
+              {num(d.low_stock_count) > 0 && (
+                <span>
+                  <span className="font-semibold text-foreground">{num(d.low_stock_count)}</span> product
+                  {num(d.low_stock_count) === 1 ? "" : "s"} low on stock (≤ {num(d.low_stock_threshold)}).{" "}
+                </span>
+              )}
+              {num(d.out_of_stock_count) > 0 && (
+                <span>
+                  <span className="font-semibold text-foreground">{num(d.out_of_stock_count)}</span> out of stock.
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Low-stock threshold is configurable in Settings.
+            </p>
+          </div>
+        </Card>
+      )}
 
       <Card className="p-4">
         <h3 className="mb-3 font-semibold">Revenue trend</h3>

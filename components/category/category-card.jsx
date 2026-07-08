@@ -1,7 +1,7 @@
 import * as React from "react";
 import Link from "next/link";
+import NextImage from "next/image";
 import { cn } from "@/lib/utils";
-import { Image } from "@/components/ui/image";
 
 export function CategoryCard({ category, className }) {
   const hasImage = category.image && !category.image.startsWith("data:");
@@ -15,12 +15,12 @@ export function CategoryCard({ category, className }) {
     >
       <span
         className={cn(
-          "flex h-[4.25rem] w-[4.25rem] items-center justify-center overflow-hidden rounded-2xl text-2xl shadow-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-md",
+          "relative flex h-[4.25rem] w-[4.25rem] items-center justify-center overflow-hidden rounded-2xl text-2xl shadow-sm transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-md",
           category.color || "bg-primary-soft"
         )}
       >
         {hasImage ? (
-          <img src={category.image} alt={category.name} className="h-full w-full object-cover" />
+          <NextImage src={category.image} alt={category.name} fill className="object-cover" />
         ) : (
           category.emoji || "🛒"
         )}

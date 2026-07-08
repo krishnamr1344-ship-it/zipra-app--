@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createUserWithEmailAndPassword, updateProfile, getAuth } from "firebase/auth";
-import firebaseApp from "@/lib/firebase/app";
 
 export async function POST(request) {
   try {
@@ -21,20 +19,54 @@ export async function POST(request) {
       );
     }
 
-    const auth = getAuth(firebaseApp);
-    const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    const resp = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          returnSecureToken: true,
+        }),
+      }
+    );
 
-    if (displayName) {
-      await updateProfile(userCredential.user, { displayName });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      const code = data.error?.message || "REGISTRATION_FAILED";
+      let status = 400;
+      if (code === "EMAIL_EXISTS") status = 409;
+      else if (code === "WEAK_PASSWORD") status = 422;
+      return NextResponse.json(
+        { error: data.error?.message || "Registration failed" },
+        { status }
+      );
     }
 
-    const idToken = await userCredential.user.getIdToken();
+    // Update display name via setAccountInfo
+    if (displayName) {
+      await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            idToken: data.idToken,
+            displayName,
+            returnSecureToken: true,
+          }),
+        }
+      );
+    }
 
     const sessionData = {
-      uid: userCredential.user.uid,
-      email: userCredential.user.email,
-      token: idToken,
-      refreshToken: userCredential.user.refreshToken,
+      uid: data.localId,
+      email: data.email,
+      token: data.idToken,
+      refreshToken: data.refreshToken,
       createdAt: Date.now(),
     };
 
@@ -50,18 +82,18 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       user: {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: displayName || userCredential.user.displayName,
-        emailVerified: userCredential.user.emailVerified,
+        uid: data.localId,
+        email: data.email,
+        displayName: displayName || email.split("@")[0],
+        emailVerified: !!data.emailVerified,
       },
-      token: idToken,
+      token: data.idToken,
     });
   } catch (error) {
     console.error("Registration error:", error);
     return NextResponse.json(
       { error: error.message || "Registration failed" },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }

@@ -97,7 +97,7 @@ export default function ProfilePage() {
             className="flex items-center gap-3 px-4 py-3.5 transition hover:bg-muted"
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground">
-              <it.icon className="h-4.5 w-4.5" />
+              <it.icon className="h-5 w-5" />
             </span>
             <span className="flex-1 text-sm font-medium">{it.label}</span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />

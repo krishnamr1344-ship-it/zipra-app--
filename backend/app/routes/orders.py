@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .. import config
 from ..database import get_db
-from ..models import Order, OrderItem, OrderStatus, OrderStatusHistory, Product, User, UserRole
+from ..models import Order, OrderItem, Product, User, UserRole
 from ..schemas import OrderCreate, OrderResponse, OrderItemResponse, OrderStatusUpdate, PaymentVerify
 from ..dependencies import get_current_user
 
@@ -20,30 +20,62 @@ razorpay_client.timeout = 10
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 VALID_TRANSITIONS = {
-    OrderStatus.placed: [OrderStatus.accepted, OrderStatus.cancelled],
-    OrderStatus.accepted: [OrderStatus.preparing, OrderStatus.cancelled],
-    OrderStatus.preparing: [OrderStatus.out_for_delivery, OrderStatus.cancelled],
-    OrderStatus.out_for_delivery: [OrderStatus.delivered],
-    OrderStatus.delivered: [],
-    OrderStatus.cancelled: [],
+    "placed": ["confirmed", "cancelled"],
+    "confirmed": ["out_for_delivery", "cancelled"],
+    "out_for_delivery": ["delivered", "cancelled"],
+    "delivered": [],
+    "cancelled": [],
 }
 
 
 def order_to_response(order: Order) -> dict:
-    return OrderResponse(
-        id=order.id,
-        status=order.status.value,
-        total_amount=order.total_amount,
-        delivery_address=order.delivery_address,
-        payment_id=order.payment_id,
-        created_at=order.created_at,
-        items=[OrderItemResponse(
-            product_id=i.product_id,
-            product_name=i.product_name,
-            quantity=i.quantity,
-            price=i.price,
-        ) for i in order.items],
-    ).model_dump()
+    addr = order.address
+    delivery_address = ""
+    if addr:
+        parts = [addr.address_line1]
+        if addr.address_line2:
+            parts.append(addr.address_line2)
+        parts.append(f"{addr.city}, {addr.state} - {addr.pincode}")
+        delivery_address = ", ".join(parts)
+
+    return {
+        "id": order.id,
+        "status": order.status,
+        "total_amount": float(order.total_amount),
+        "address_id": order.address_id,
+        "delivery_address": delivery_address,
+        "payment_method": order.payment_method,
+        "delivery_fee": float(order.delivery_fee or 0),
+        "delivery_otp": order.delivery_otp,
+        "created_at": order.created_at.isoformat(),
+        "items": [
+            {
+                "product_id": i.product_id,
+                "product_name": i.product_name,
+                "quantity": i.quantity,
+                "product_price": float(i.product_price),
+                "subtotal": float(i.subtotal),
+                "product_image": "",
+            }
+            for i in order.items
+        ],
+    }
+
+
+@router.get("/{order_id}")
+def get_order(
+    order_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    order = db.query(Order).options(
+        selectinload(Order.items), selectinload(Order.address)
+    ).filter(Order.id == order_id, Order.is_deleted == False).first()
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order.user_id != user.id and user.role != "admin":
+        raise HTTPException(403, "You can only view your own orders")
+    return order_to_response(order)
 
 
 @router.post("")
@@ -53,19 +85,19 @@ def create_order(
     user: User = Depends(get_current_user),
     idempotency_key: str = Header(default="", alias="Idempotency-Key"),
 ):
-    if user.role != UserRole.customer:
+    if user.role != "customer":
         raise HTTPException(403, "Only customers can place orders")
 
     if idempotency_key:
         existing = db.query(Order).filter(
             Order.idempotency_key == idempotency_key,
-            Order.customer_id == user.id,
+            Order.user_id == user.id,
         ).first()
         if existing:
             return {
                 "order_id": existing.id,
-                "razorpay_order_id": existing.razorpay_order_id,
-                "amount": existing.total_amount,
+                "delivery_fee": float(existing.delivery_fee or 0),
+                "amount": float(existing.total_amount),
             }
 
     product_ids = [item.product_id for item in data.items]
@@ -73,38 +105,44 @@ def create_order(
         p.id: p for p in db.query(Product).filter(Product.id.in_(product_ids)).with_for_update().all()
     }
 
-    unavailable = [pid for pid in product_ids if pid not in products or not products[pid].is_available]
+    unavailable = [pid for pid in product_ids if pid not in products or products[pid].is_deleted]
     if unavailable:
-        raise HTTPException(400, f"Products unavailable or not found: {', '.join(unavailable)}")
+        raise HTTPException(400, f"Products unavailable: {', '.join(unavailable)}")
 
     insufficient = [
-        f"{products[pid].name} (requested {next(i.quantity for i in data.items if i.product_id == pid)}, available {products[pid].stock_quantity})"
+        f"{products[pid].name} (need {next(i.quantity for i in data.items if i.product_id == pid)}, have {products[pid].stock})"
         for pid in product_ids
-        if products[pid].stock_quantity < next(i.quantity for i in data.items if i.product_id == pid)
+        if products[pid].stock < next(i.quantity for i in data.items if i.product_id == pid)
     ]
     if insufficient:
         raise HTTPException(400, f"Insufficient stock: {'; '.join(insufficient)}")
 
-    total_amount = sum(products[item.product_id].price * item.quantity for item in data.items)
+    total_amount = sum(
+        float(products[item.product_id].price) * item.quantity
+        for item in data.items
+    ) + data.delivery_fee
 
     order = Order(
-        customer_id=user.id,
+        user_id=user.id,
         total_amount=total_amount,
-        delivery_address=data.delivery_address,
+        address_id=data.address_id,
         payment_method=data.payment_method,
+        delivery_fee=data.delivery_fee,
     )
     db.add(order)
     db.flush()
 
     for item in data.items:
         product = products[item.product_id]
-        product.stock_quantity -= item.quantity
+        product.stock -= item.quantity
+        subtotal = float(product.price) * item.quantity
         order_item = OrderItem(
             order_id=order.id,
             product_id=item.product_id,
             product_name=product.name,
+            product_price=float(product.price),
             quantity=item.quantity,
-            price=product.price,
+            subtotal=subtotal,
         )
         db.add(order_item)
 
@@ -113,11 +151,9 @@ def create_order(
         "currency": "INR",
         "receipt": order.id,
     })
-    order.razorpay_order_id = razorpay_order["id"]
+
     order.idempotency_key = idempotency_key
 
-    history = OrderStatusHistory(order_id=order.id, status=OrderStatus.placed)
-    db.add(history)
     db.commit()
     db.refresh(order)
 
@@ -125,8 +161,8 @@ def create_order(
 
     return {
         "order_id": order.id,
-        "razorpay_order_id": razorpay_order["id"],
-        "amount": total_amount,
+        "delivery_fee": float(order.delivery_fee or 0),
+        "amount": float(total_amount),
     }
 
 
@@ -140,9 +176,8 @@ def verify_payment(
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(404, "Order not found")
-
-    if order.customer_id != user.id and user.role != UserRole.admin:
-        raise HTTPException(403, "You can only verify your own orders")
+    if order.user_id != user.id and user.role != "admin":
+        raise HTTPException(403, "Not authorized")
 
     expected = hmac.new(
         config.RAZORPAY_KEY_SECRET.encode(),
@@ -154,12 +189,9 @@ def verify_payment(
 
     payment = razorpay_client.payment.fetch(data.payment_id)
     if payment.get("status") != "captured":
-        logger.warning("Payment not captured", extra={"order_id": order.id, "payment_id": data.payment_id})
         raise HTTPException(400, "Payment not captured")
 
-    order.payment_id = data.payment_id
-    db.commit()
-    logger.info("Payment verified", extra={"order_id": order.id, "payment_id": data.payment_id, "user_id": user.id})
+    logger.info("Payment verified", extra={"order_id": order.id, "payment_id": data.payment_id})
     return {"success": True}
 
 
@@ -170,7 +202,9 @@ def my_orders(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
 ):
-    query = db.query(Order).options(selectinload(Order.items)).filter(Order.customer_id == user.id)
+    query = db.query(Order).options(
+        selectinload(Order.items), selectinload(Order.address)
+    ).filter(Order.user_id == user.id, Order.is_deleted == False)
     total = query.count()
     orders = query.order_by(Order.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
     return {"orders": [order_to_response(o) for o in orders], "total": total, "page": page, "per_page": per_page}
@@ -183,12 +217,13 @@ def shop_orders(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
 ):
-    if user.role != UserRole.shop_owner:
+    if user.role != "shop_owner":
         raise HTTPException(403, "Only shop owners can view shop orders")
-
-    product_ids = db.query(Product.id).filter(Product.shop_owner_id == user.id).subquery()
+    product_ids = db.query(Product.id).filter(Product.is_deleted == False).subquery()
     order_ids_q = db.query(OrderItem.order_id).filter(OrderItem.product_id.in_(product_ids)).distinct().subquery()
-    query = db.query(Order).options(selectinload(Order.items)).filter(Order.id.in_(order_ids_q))
+    query = db.query(Order).options(
+        selectinload(Order.items), selectinload(Order.address)
+    ).filter(Order.id.in_(order_ids_q), Order.is_deleted == False)
     total = query.count()
     orders = query.order_by(Order.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
     return {"orders": [order_to_response(o) for o in orders], "total": total, "page": page, "per_page": per_page}
@@ -204,34 +239,18 @@ def update_order_status(
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(404, "Order not found")
-
-    if user.role not in [UserRole.shop_owner, UserRole.admin]:
+    if user.role not in ("shop_owner", "admin"):
         raise HTTPException(403, "Only shop owners can update status")
 
-    if user.role == UserRole.shop_owner:
-        owns_product_in_order = db.query(OrderItem.id).join(Product).filter(
-            OrderItem.order_id == order.id,
-            Product.shop_owner_id == user.id,
-        ).first()
-        if not owns_product_in_order:
-            raise HTTPException(403, "You can only update orders containing your products")
-
-    try:
-        new_status = OrderStatus(data.status)
-    except ValueError:
-        raise HTTPException(400, "Invalid status")
-
-    allowed = VALID_TRANSITIONS.get(order.status, [])
-    if new_status not in allowed:
+    if data.status not in VALID_TRANSITIONS.get(order.status, []):
+        allowed = VALID_TRANSITIONS.get(order.status, [])
         raise HTTPException(
             400,
-            f"Cannot transition from '{order.status.value}' to '{new_status.value}'. "
-            f"Allowed transitions: {[s.value for s in allowed] or ['none']}",
+            f"Cannot transition from '{order.status}' to '{data.status}'. "
+            f"Allowed: {allowed or ['none']}",
         )
 
-    order.status = new_status
-    history = OrderStatusHistory(order_id=order.id, status=new_status)
-    db.add(history)
+    order.status = data.status
     db.commit()
     return {"success": True, "order": order_to_response(order)}
 
@@ -243,9 +262,11 @@ def all_orders(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
 ):
-    if user.role != UserRole.admin:
+    if user.role != "admin":
         raise HTTPException(403, "Admin only")
-    query = db.query(Order).options(selectinload(Order.items))
+    query = db.query(Order).options(
+        selectinload(Order.items), selectinload(Order.address)
+    ).filter(Order.is_deleted == False)
     total = query.count()
     orders = query.order_by(Order.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
     return {"orders": [order_to_response(o) for o in orders], "total": total, "page": page, "per_page": per_page}

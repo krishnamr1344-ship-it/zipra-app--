@@ -11,8 +11,6 @@ export const BRAND = {
 
 export const DELIVERY = {
   etaMinutes: 10,
-  freeAbove: 499,
-  fee: 29,
   minOrder: 99,
 };
 
@@ -28,6 +26,7 @@ export const API_ENDPOINTS = {
   ORDERS: "/orders",
   ORDER: (id) => `/orders/${id}`,
   ADDRESSES: "/addresses",
+  ADDRESS_ITEM: (id) => `/addresses/${id}`,
   ADDRESS_DEFAULT: (id) => `/addresses/${id}/default`,
   WISHLIST: "/wishlist",
   WISHLIST_ITEM: (id) => `/wishlist/${id}`,
@@ -50,14 +49,12 @@ export const LOCALE = "en-IN";
 export const PAYMENT_METHODS = [
   { id: "cod", label: "Cash on Delivery", icon: "cash", desc: "Pay when your order arrives" },
   { id: "razorpay", label: "Razorpay", icon: "card", desc: "UPI, Cards & Wallets" },
-  { id: "wallet", label: "Zipra Wallet", icon: "wallet", desc: "Pay from your wallet balance" },
 ];
 
 export const ORDER_STATUS = {
-  PLACED: { label: "Order Placed", color: "muted" },
-  CONFIRMED: { label: "Confirmed", color: "primary" },
-  PACKED: { label: "Packed", color: "primary" },
-  OUT_FOR_DELIVERY: { label: "Out for Delivery", color: "warning" },
-  DELIVERED: { label: "Delivered", color: "success" },
-  CANCELLED: { label: "Cancelled", color: "destructive" },
+  placed: { label: "Order Placed", color: "muted" },
+  confirmed: { label: "Confirmed", color: "primary" },
+  out_for_delivery: { label: "Out for Delivery", color: "warning" },
+  delivered: { label: "Delivered", color: "success" },
+  cancelled: { label: "Cancelled", color: "destructive" },
 };

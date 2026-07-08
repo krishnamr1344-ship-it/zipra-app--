@@ -1,4 +1,5 @@
 import * as React from "react";
+import NextImage from "next/image";
 import { cn } from "@/lib/utils";
 
 export function Image({
@@ -29,17 +30,18 @@ export function Image({
           )}
         </div>
       ) : (
-        <img
+        <NextImage
           src={src}
           alt={alt}
-          loading="lazy"
-          onLoad={() => setLoaded(true)}
-          onError={() => setError(true)}
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className={cn(
-            "h-full w-full object-cover transition-opacity duration-500",
+            "object-cover transition-opacity duration-500",
             loaded ? "opacity-100" : "opacity-0",
             imgClassName
           )}
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
         />
       )}
     </div>

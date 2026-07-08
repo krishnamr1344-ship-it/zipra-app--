@@ -12,7 +12,7 @@ import firebase_admin
 from firebase_admin import auth as firebase_auth, credentials
 
 from .database import get_db
-from .models import User, UserRole
+from .models import User
 
 logger = logging.getLogger("zipra.auth")
 
@@ -36,6 +36,13 @@ def get_firebase_app():
     return firebase_admin.get_app()
 
 
+def _revocation_check_enabled() -> bool:
+    """Revocation checks require valid Firebase credentials to fetch the
+    revocation state. Only enable it when credentials are configured so we
+    stay secure in production yet don't break environments without them."""
+    return bool(os.getenv("FIREBASE_CREDENTIALS"))
+
+
 def get_or_create_user(db: Session, decoded: dict) -> User:
     firebase_uid = decoded["uid"]
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
@@ -49,7 +56,7 @@ def get_or_create_user(db: Session, decoded: dict) -> User:
                 name=name,
                 phone=phone,
                 email=email,
-                role=UserRole.customer,
+                role="customer",
             )
             db.add(user)
             db.commit()
@@ -70,7 +77,9 @@ def get_current_user(
     token = authorization[7:]
     try:
         get_firebase_app()
-        decoded = firebase_auth.verify_id_token(token, check_revoked=False)
+        decoded = firebase_auth.verify_id_token(
+            token, check_revoked=_revocation_check_enabled()
+        )
         firebase_uid = decoded.get("uid")
     except Exception as e:
         logger.error("Token verification failed: %s", e)

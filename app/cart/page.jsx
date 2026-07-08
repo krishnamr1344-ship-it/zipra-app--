@@ -4,13 +4,13 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Tag, ShoppingBag, Truck, Percent } from "lucide-react";
 import { useStore } from "@/store/useStore";
-import { DELIVERY } from "@/constants/app";
 import { formatPrice } from "@/utils";
 import { CartItem } from "@/components/cart/cart-item";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/providers/toast-provider";
+import api from "@/services/api";
 
 export default function CartPage() {
   const router = useRouter();
@@ -20,16 +20,27 @@ export default function CartPage() {
   const { toast } = useToast();
   const [coupon, setCoupon] = React.useState("");
   const [applied, setApplied] = React.useState(null);
+  const [couponDiscount, setCouponDiscount] = React.useState(0);
 
   const savings = mrpTotal - subtotal;
-  const deliveryFee = subtotal >= DELIVERY.freeAbove || subtotal === 0 ? 0 : DELIVERY.fee;
-  const couponDiscount = applied ? Math.round(subtotal * 0.1) : 0;
-  const total = subtotal + deliveryFee - couponDiscount;
+  const deliveryFee = "estimate";
+  const total = subtotal - couponDiscount;
 
-  const applyCoupon = () => {
+  const applyCoupon = async () => {
     if (!coupon.trim()) return;
-    setApplied(coupon.trim().toUpperCase());
-    toast({ variant: "success", title: "Coupon applied", description: `10% off with ${coupon.trim().toUpperCase()}` });
+    try {
+      const { data } = await api.post("/coupons/validate", {
+        code: coupon.trim(),
+        cart_total: subtotal,
+      });
+      const pct = data.discount_percent || 0;
+      setApplied(data.code);
+      setCouponDiscount(Math.round(subtotal * (pct / 100)));
+      toast({ variant: "success", title: "Coupon applied", description: `${pct}% off with ${data.code}` });
+    } catch (err) {
+      const msg = err?.response?.data?.detail || "Invalid coupon code";
+      toast({ variant: "error", title: "Coupon invalid", description: msg });
+    }
   };
 
   if (cart.length === 0)
@@ -63,11 +74,11 @@ export default function CartPage() {
         {applied ? (
           <div className="flex items-center justify-between rounded-xl bg-primary-soft px-3 py-2.5">
             <span className="text-sm font-semibold text-primary-soft-foreground">
-              {applied} applied · 10% off
+              {applied} applied · {Math.round((couponDiscount / subtotal) * 100)}% off
             </span>
             <button
               className="text-xs font-semibold text-destructive"
-              onClick={() => setApplied(null)}
+              onClick={() => { setApplied(null); setCouponDiscount(0); }}
             >
               Remove
             </button>
@@ -98,8 +109,8 @@ export default function CartPage() {
               <Truck className="h-3.5 w-3.5" /> Delivery fee
             </span>
           }
-          value={deliveryFee === 0 ? "FREE" : formatPrice(deliveryFee)}
-          accent={deliveryFee === 0 ? "success" : undefined}
+          value="At checkout"
+          accent={undefined}
         />
         {couponDiscount > 0 && (
           <Row label={`Coupon (${applied})`} value={`-${formatPrice(couponDiscount)}`} accent="success" />

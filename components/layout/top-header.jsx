@@ -8,13 +8,16 @@ import { usePathname } from "next/navigation";
 import { DELIVERY } from "@/constants/app";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { LocationPicker } from "@/components/location/location-picker";
 
 export function TopHeader() {
   const cartCount = useStore((s) => s.cart.reduce((n, i) => n + i.qty, 0));
   const wishlistCount = useStore((s) => s.wishlist.length);
+  const deliveryAddress = useStore((s) => s.deliveryAddress);
   const pathname = usePathname();
   const [scrolled, setScrolled] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
+  const [locationOpen, setLocationOpen] = React.useState(false);
 
   React.useEffect(() => {
     setMounted(true);
@@ -23,6 +26,10 @@ export function TopHeader() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  const locationLabel = deliveryAddress
+    ? `${deliveryAddress.city}${deliveryAddress.pincode ? ` ${deliveryAddress.pincode}` : ""}`
+    : "Set location";
 
   return (
     <header
@@ -45,11 +52,14 @@ export function TopHeader() {
             />
           </Link>
 
-          <button className="flex min-w-0 flex-1 items-center gap-1.5 rounded-full px-2 py-2 text-left transition hover:bg-white/15">
-            <MapPin className="h-4.5 w-4.5 shrink-0 text-white drop-shadow" />
+          <button
+            onClick={() => setLocationOpen(true)}
+            className="flex min-w-0 flex-1 items-center gap-1.5 rounded-full px-2 py-2 text-left transition hover:bg-white/15"
+          >
+            <MapPin className="h-5 w-5 shrink-0 text-white drop-shadow" />
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold leading-tight drop-shadow-sm">
-                Home · Bengaluru 560001
+                {locationLabel}
               </span>
               <span className="block text-[11px] leading-tight text-white/85">
                 Deliver in {DELIVERY.etaMinutes} mins
@@ -98,13 +108,15 @@ export function TopHeader() {
           aria-label="Search"
           className="flex items-center gap-2.5 rounded-full bg-white px-4 py-2.5 text-left shadow-lg shadow-orange-900/15 transition hover:shadow-xl"
         >
-          <Search className="h-4.5 w-4.5 shrink-0 text-[#FF7A00]" />
+          <Search className="h-5 w-5 shrink-0 text-[#FF7A00]" />
           <span className="flex-1 text-sm text-muted-foreground">
             Search groceries, fruits, vegetables...
           </span>
-          <Mic className="h-4.5 w-4.5 shrink-0 text-muted-foreground" />
+          <Mic className="h-5 w-5 shrink-0 text-muted-foreground" />
         </Link>
       </div>
+
+      <LocationPicker open={locationOpen} onOpenChange={setLocationOpen} />
     </header>
   );
 }

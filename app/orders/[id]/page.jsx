@@ -55,6 +55,7 @@ export default function OrderDetailPage() {
   const currentStep = STEPS.indexOf(order.status);
   const delivered = order.status === "DELIVERED";
   const cancelled = order.status === "CANCELLED";
+  const active = !delivered && !cancelled;
 
   return (
     <div className="space-y-4 pb-24">

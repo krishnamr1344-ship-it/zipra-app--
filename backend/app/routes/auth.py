@@ -19,7 +19,7 @@ def get_user_response(user: User, token: str = "") -> UserResponse:
         name=user.name,
         email=user.email or "",
         phone=user.phone or "",
-        role=user.role.value,
+        role=user.role,
         token=token,
     )
 

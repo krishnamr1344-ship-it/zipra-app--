@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "**" },
+    ],
+  },
   async rewrites() {
     const target = (
       process.env.NEXT_PUBLIC_API_BASE_URL ||

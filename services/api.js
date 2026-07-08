@@ -24,6 +24,27 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
+let _authToken = null;
+
+export function setAuthToken(token) {
+  _authToken = token;
+  if (typeof window !== "undefined") {
+    if (token) {
+      window.localStorage.setItem("zipra_token", token);
+    } else {
+      window.localStorage.removeItem("zipra_token");
+    }
+  }
+}
+
+export function getAuthToken() {
+  if (_authToken) return _authToken;
+  if (typeof window !== "undefined") {
+    _authToken = window.localStorage.getItem("zipra_token");
+  }
+  return _authToken;
+}
+
 const AUTH_PATHS_PREFIXES = [
   "/auth/login",
   "/auth/register",
@@ -33,6 +54,10 @@ const AUTH_PATHS_PREFIXES = [
 
 api.interceptors.request.use(
   (config) => {
+    const token = getAuthToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {
@@ -126,12 +151,59 @@ export const productsService = {
     });
     return adapters.mapProducts(data).filter((p) => p.id !== id);
   },
+  async create(payload) {
+    const { data } = await api.post(API_ENDPOINTS.PRODUCTS, payload);
+    return adapters.mapProduct(data.product);
+  },
+  async update(id, payload) {
+    const { data } = await api.patch(API_ENDPOINTS.PRODUCT(id), payload);
+    return adapters.mapProduct(data.product);
+  },
+  async remove(id) {
+    await api.delete(API_ENDPOINTS.PRODUCT(id));
+    return true;
+  },
+  async createVariant(productId, payload) {
+    const { data } = await api.post(`${API_ENDPOINTS.PRODUCTS}/${productId}/variants`, payload);
+    return data.variant;
+  },
+  async updateVariant(productId, variantId, payload) {
+    const { data } = await api.patch(`${API_ENDPOINTS.PRODUCTS}/${productId}/variants/${variantId}`, payload);
+    return data.variant;
+  },
+  async removeVariant(productId, variantId) {
+    await api.delete(`${API_ENDPOINTS.PRODUCTS}/${productId}/variants/${variantId}`);
+    return true;
+  },
+};
+
+export const uploadService = {
+  async upload(file) {
+    const form = new FormData();
+    form.append("file", file);
+    const { data } = await api.post("/upload", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
+  },
 };
 
 export const categoriesService = {
   async list() {
     const { data } = await api.get(API_ENDPOINTS.CATEGORIES);
     return adapters.mapCategories(data);
+  },
+  async create(payload) {
+    const { data } = await api.post(API_ENDPOINTS.CATEGORIES, payload);
+    return data.category;
+  },
+  async update(id, payload) {
+    const { data } = await api.patch(`${API_ENDPOINTS.CATEGORIES}/${id}`, payload);
+    return data.category;
+  },
+  async remove(id) {
+    await api.delete(`${API_ENDPOINTS.CATEGORIES}/${id}`);
+    return true;
   },
 };
 
@@ -149,6 +221,13 @@ export const searchService = {
       params: { search: query, limit: 6 },
     });
     return adapters.mapProducts(data);
+  },
+  async trending() {
+    const { data } = await api.get(API_ENDPOINTS.SEARCH, {
+      params: { sort_by: "popular", limit: 8 },
+    });
+    const products = adapters.mapProducts(data);
+    return products.map((p) => p.name).slice(0, 8);
   },
 };
 
@@ -217,6 +296,10 @@ export const ordersService = {
     });
     return adapters.mapOrder(data);
   },
+  async verifyPayment(orderId, payload) {
+    const { data } = await api.patch(`/orders/${orderId}/verify`, payload);
+    return data;
+  },
 };
 
 export const paymentsService = {
@@ -231,8 +314,8 @@ export const paymentsService = {
     const { data } = await api.post("/payments/verify", payload);
     return data;
   },
-  async process(payload) {
-    const { data } = await api.post("/payments/process", payload);
+  async config() {
+    const { data } = await api.get("/config");
     return data;
   },
 };
@@ -260,6 +343,14 @@ export const addressesService = {
   async create(payload) {
     const { data } = await api.post(API_ENDPOINTS.ADDRESSES, payload);
     return adapters.mapAddress(data);
+  },
+  async update(id, payload) {
+    const { data } = await api.put(API_ENDPOINTS.ADDRESS_ITEM(id), payload);
+    return adapters.mapAddress(data);
+  },
+  async remove(id) {
+    const { data } = await api.delete(API_ENDPOINTS.ADDRESS_ITEM(id));
+    return data;
   },
   async setDefault(id) {
     const { data } = await api.post(API_ENDPOINTS.ADDRESS_DEFAULT(id));
@@ -310,6 +401,19 @@ export const analyticsService = {
   },
 };
 
+export const adminSettingsService = {
+  async get() {
+    const { data } = await api.get("/admin/settings");
+    return data;
+  },
+  async update(lowStockThreshold) {
+    const { data } = await api.patch("/admin/settings", {
+      low_stock_threshold: lowStockThreshold,
+    });
+    return data;
+  },
+};
+
 export const adminUsersService = {
   async list() {
     const { data } = await api.get("/admin/users");
@@ -328,15 +432,33 @@ export const adminUsersService = {
 
 export const adminBannersService = {
   async list() {
-    const { data } = await api.get("/admin/banners");
+    const { data } = await api.get("/banners");
     const arr = Array.isArray(data) ? data : data?.items || data?.data || [];
     return arr.map((b) => ({
       id: b.id,
       title: b.title || "",
+      subtitle: b.subtitle || "",
+      image_url: b.image_url || "",
+      link: b.link || "",
+      color: b.color || "from-[#FF9A3D] to-[#F26400]",
+      is_active: b.is_active !== false,
+      sort_order: b.sort_order || 0,
       status: b.is_active ? "Live" : "Scheduled",
       cta: b.cta || "Shop Now",
       gradient: b.color || "from-[#FF9A3D] to-[#F26400]",
     }));
+  },
+  async create(payload) {
+    const { data } = await api.post("/banners", payload);
+    return data.banner;
+  },
+  async update(id, payload) {
+    const { data } = await api.patch(`/banners/${id}`, payload);
+    return data.banner;
+  },
+  async remove(id) {
+    await api.delete(`/banners/${id}`);
+    return true;
   },
 };
 
@@ -351,6 +473,28 @@ export const adminNotificationsService = {
       body: n.message || n.body || "",
       sent: n.created_at ? new Date(n.created_at).toLocaleDateString("en-IN") : "recent",
     }));
+  },
+};
+
+export const couponsService = {
+  async list() {
+    try {
+      const { data } = await api.get("/admin/coupons");
+      return Array.isArray(data) ? data : data?.items || [];
+    } catch {
+      return [];
+    }
+  },
+};
+
+export const deliveryZonesService = {
+  async list() {
+    const { data } = await api.get("/delivery-zones");
+    return Array.isArray(data) ? data : data?.items || [];
+  },
+  async check(lat, lng) {
+    const { data } = await api.get("/delivery-zones/check", { params: { lat, lng } });
+    return data;
   },
 };
 
@@ -371,6 +515,8 @@ export const services = {
   adminUsers: adminUsersService,
   adminBanners: adminBannersService,
   adminNotifications: adminNotificationsService,
+  coupons: couponsService,
+  deliveryZones: deliveryZonesService,
 };
 
 export default api;

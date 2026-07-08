@@ -13,6 +13,7 @@ import {
   Ticket,
   Image as ImageIcon,
   Settings,
+  MapPin,
   ChevronLeft,
   LogOut,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const NAV = [
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/coupons", label: "Coupons", icon: Ticket },
   { href: "/admin/banners", label: "Banners", icon: ImageIcon },
+  { href: "/admin/delivery-zones", label: "Delivery Zones", icon: MapPin },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
@@ -56,7 +58,7 @@ export default function AdminLayout({ children }) {
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
-                <item.icon className="h-4.5 w-4.5" />
+                <item.icon className="h-5 w-5" />
                 {item.label}
               </Link>
             );
@@ -67,7 +69,7 @@ export default function AdminLayout({ children }) {
             href="/"
             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
-            <LogOut className="h-4.5 w-4.5" /> Back to Store
+            <LogOut className="h-5 w-5" /> Back to Store
           </Link>
         </div>
       </aside>

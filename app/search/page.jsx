@@ -32,7 +32,7 @@ export default function SearchPage() {
   const { toast } = useToast();
 
   React.useEffect(() => {
-    setTrending(searchService.trending());
+    searchService.trending().then(setTrending).catch(() => {});
   }, []);
 
   React.useEffect(() => {

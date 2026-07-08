@@ -1,17 +1,22 @@
 import { create } from "zustand";
-import { cartService, wishlistService } from "@/services/api";
+import { cartService, wishlistService, addressesService } from "@/services/api";
 
 const STORAGE_KEY = "zipra-store";
 
 function loadPersisted() {
-  if (typeof window === "undefined") return { cart: [], wishlist: [] };
+  if (typeof window === "undefined") return { cart: [], wishlist: [], deliveryAddress: null, currentLocation: null };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { cart: [], wishlist: [] };
+    if (!raw) return { cart: [], wishlist: [], deliveryAddress: null, currentLocation: null };
     const parsed = JSON.parse(raw);
-    return { cart: parsed.cart || [], wishlist: parsed.wishlist || [] };
+    return {
+      cart: parsed.cart || [],
+      wishlist: parsed.wishlist || [],
+      deliveryAddress: parsed.deliveryAddress || null,
+      currentLocation: parsed.currentLocation || null,
+    };
   } catch {
-    return { cart: [], wishlist: [] };
+    return { cart: [], wishlist: [], deliveryAddress: null, currentLocation: null };
   }
 }
 
@@ -20,7 +25,12 @@ function persist(state) {
   try {
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ cart: state.cart, wishlist: state.wishlist })
+      JSON.stringify({
+        cart: state.cart,
+        wishlist: state.wishlist,
+        deliveryAddress: state.deliveryAddress,
+        currentLocation: state.currentLocation,
+      })
     );
   } catch {}
 }
@@ -31,10 +41,40 @@ export const useStore = create((set, get) => ({
   cart: initial.cart,
   wishlist: initial.wishlist,
   syncing: false,
+  deliveryAddress: initial.deliveryAddress,
+  currentLocation: initial.currentLocation,
+  addresses: [],
+
+  // ---- Location ----
+  setDeliveryAddress: (addr) => {
+    set({ deliveryAddress: addr });
+    persist({ ...get(), deliveryAddress: addr });
+  },
+
+  setCurrentLocation: (loc) => {
+    set({ currentLocation: loc });
+    persist({ ...get(), currentLocation: loc });
+  },
+
+  setAddresses: (list) => set({ addresses: list }),
+
+  fetchAddresses: async () => {
+    try {
+      const list = await addressesService.list();
+      set({ addresses: list });
+      const current = get().deliveryAddress;
+      if (!current && list.length > 0) {
+        const def = list.find((a) => a.isDefault) || list[0];
+        get().setDeliveryAddress(def);
+      }
+    } catch {}
+  },
 
   // ---- Cart ----
   addToCart: async (product, qty = 1) => {
-    // optimistic
+    if (!product || product.stock !== undefined && product.stock <= 0) {
+      return;
+    }
     set((state) => {
       const existing = state.cart.find((i) => i.id === product.id);
       const cart = existing

@@ -7,7 +7,7 @@ const PROTECTED_ROUTES = [
 
 const ADMIN_ROUTES = ["/admin"];
 
-const AUTH_ROUTES = ["/auth/login", "/auth/register", "/auth/otp"];
+const AUTH_ROUTES = ["/auth/login"];
 
 function isProtectedRoute(pathname) {
   return PROTECTED_ROUTES.some((route) => pathname.startsWith(route));

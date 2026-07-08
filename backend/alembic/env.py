@@ -13,7 +13,7 @@ if config.config_file_name is not None:
 import sys
 sys.path.insert(0, ".")
 from app.database import Base
-from app.models import User, Product, Order, OrderItem, OrderStatusHistory
+from app.models import User, Category, Product, ProductImage, Address, CartItem, WishlistItem, Order, OrderItem, Payment, PaymentIntent, Banner, Notification
 target_metadata = Base.metadata
 
 

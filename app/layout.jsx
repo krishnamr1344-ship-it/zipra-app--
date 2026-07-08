@@ -1,5 +1,6 @@
 import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { ToastProvider } from "@/components/providers/toast-provider";
@@ -28,11 +29,13 @@ export const metadata = {
   applicationName: "Zipra",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
-
+    capable: true,
     statusBarStyle: "default",
     title: "Zipra",
   },
-  mobileWebAppCapable: true,
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
   icons: {
     icon: [
       { url: "/icons/favicon-16x16.png", sizes: "16x16", type: "image/png" },

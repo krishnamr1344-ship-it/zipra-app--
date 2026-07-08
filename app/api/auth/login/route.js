@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { signInWithEmailAndPassword, getAuth } from "firebase/auth";
-import firebaseApp from "@/lib/firebase/app";
 
 export async function POST(request) {
   try {
@@ -14,16 +12,39 @@ export async function POST(request) {
       );
     }
 
-    const auth = getAuth(firebaseApp);
-    const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-    const idToken = await userCredential.user.getIdToken();
-    const re = userCredential.user.toJSON();
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    const resp = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          returnSecureToken: true,
+        }),
+      }
+    );
+
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      const code = data.error?.message || "INVALID_LOGIN";
+      let status = 401;
+      if (code === "EMAIL_NOT_FOUND" || code === "INVALID_PASSWORD" || code === "INVALID_LOGIN_CREDENTIALS") status = 401;
+      else if (code === "USER_DISABLED") status = 403;
+      else if (code === "TOO_MANY_ATTEMPTS_TRY_LATER") status = 429;
+      return NextResponse.json(
+        { error: data.error?.message || "Invalid email or password" },
+        { status }
+      );
+    }
 
     const sessionData = {
-      uid: userCredential.user.uid,
-      email: userCredential.user.email,
-      token: idToken,
-      refreshToken: userCredential.user.refreshToken,
+      uid: data.localId,
+      email: data.email,
+      token: data.idToken,
+      refreshToken: data.refreshToken,
       createdAt: Date.now(),
     };
 
@@ -39,19 +60,18 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       user: {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: userCredential.user.displayName,
-        emailVerified: userCredential.user.emailVerified,
+        uid: data.localId,
+        email: data.email,
+        displayName: data.displayName || email.split("@")[0],
+        emailVerified: !!data.emailVerified,
       },
-      token: idToken,
+      token: data.idToken,
     });
   } catch (error) {
     console.error("Login error:", error);
-    const status = error.code === "auth/user-not-found" || error.code === "auth/wrong-password" || error.code === "auth/invalid-credential" ? 401 : 500;
     return NextResponse.json(
       { error: error.message || "Login failed" },
-      { status }
+      { status: 500 }
     );
   }
 }

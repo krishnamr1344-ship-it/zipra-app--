@@ -14,6 +14,7 @@ import {
   getCurrentUser,
 } from "./auth";
 import { AUTH_SUCCESS } from "./config";
+import { setAuthToken, getAuthToken } from "@/services/api";
 
 /**
  * Auth Context
@@ -30,6 +31,20 @@ export function FirebaseAuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [tokenExpiration, setTokenExpiration] = useState(null);
 
+  // Refresh Firebase token
+  const refreshToken = useCallback(async () => {
+    try {
+      const tokenData = await getTokenWithExpiration();
+      if (tokenData) {
+        setToken(tokenData.token);
+        setAuthToken(tokenData.token);
+        setTokenExpiration(new Date(tokenData.expirationTime));
+      }
+    } catch (error) {
+      console.error("Error refreshing token:", error);
+    }
+  }, []);
+
   // Initialize auth state
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -43,27 +58,17 @@ export function FirebaseAuthProvider({ children }) {
       setUser(firebaseUser);
       if (firebaseUser) {
         await refreshToken();
+        const stored = getAuthToken();
+        if (stored) setToken(stored);
       } else {
         setToken(null);
         setTokenExpiration(null);
+        setAuthToken(null);
       }
     });
 
     return () => unsubscribe();
   }, [refreshToken]);
-
-  // Refresh Firebase token
-  const refreshToken = useCallback(async () => {
-    try {
-      const tokenData = await getTokenWithExpiration();
-      if (tokenData) {
-        setToken(tokenData.token);
-        setTokenExpiration(new Date(tokenData.expirationTime));
-      }
-    } catch (error) {
-      console.error("Error refreshing token:", error);
-    }
-  }, []);
 
   // Sign in with email/password
   const login = useCallback(async (email, password) => {
@@ -92,6 +97,7 @@ export function FirebaseAuthProvider({ children }) {
     setUser(null);
     setToken(null);
     setTokenExpiration(null);
+    setAuthToken(null);
   }, []);
 
   // Reset password

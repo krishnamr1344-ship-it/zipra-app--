@@ -43,6 +43,7 @@ export default function ProductDetailPage() {
   const isWishlisted = useStore((s) => s.wishlist.some((i) => i.id === product?.id));
   const qty = useStore((s) => s.cart.find((i) => i.id === product?.id)?.qty || 0);
   const { toast } = useToast();
+  const [variant, setVariant] = React.useState(null);
 
   React.useEffect(() => {
     let active = true;
@@ -67,6 +68,10 @@ export default function ProductDetailPage() {
     return () => (active = false);
   }, [id]);
 
+  React.useEffect(() => {
+    setVariant(null);
+  }, [id]);
+
   if (loading)
     return (
       <div className="space-y-4">
@@ -82,6 +87,15 @@ export default function ProductDetailPage() {
 
   const pct = discountPercent(product.price, product.mrp);
   const gallery = [product.image, product.image, product.image];
+
+  const selectedVariant =
+    variant && Array.isArray(product.variants) && product.variants.length ? variant : null;
+  const effectivePrice = selectedVariant?.price != null ? selectedVariant.price : product.price;
+  const effectiveStock = selectedVariant ? selectedVariant.stock : product.stock;
+  const variantInStock = effectiveStock > 0;
+  const variantProduct = selectedVariant
+    ? { ...product, price: effectivePrice, name: `${product.name} (${selectedVariant.name})` }
+    : product;
 
   return (
     <div className="space-y-5 pb-24">
@@ -166,10 +180,47 @@ export default function ProductDetailPage() {
           >
             {product.inStock ? "In Stock" : "Out of Stock"}
           </span>
+          {!product.inStock && (
+            <Badge variant="destructive" className="ml-1">
+              Out of Stock
+            </Badge>
+          )}
         </div>
 
+        {Array.isArray(product.variants) && product.variants.length > 0 && (
+          <div className="mt-3">
+            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Variants</p>
+            <div className="flex flex-wrap gap-2">
+              {product.variants.map((v) => {
+                const active = selectedVariant?.id === v.id;
+                const out = (v.stock || 0) <= 0;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setVariant(active ? null : v)}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-sm font-medium transition",
+                      active
+                        ? "border-primary bg-primary-soft text-primary-soft-foreground"
+                        : out
+                        ? "border-border text-muted-foreground line-through"
+                        : "border-input text-foreground hover:border-primary"
+                    )}
+                  >
+                    {v.name}
+                    {v.price != null && (
+                      <span className="ml-1 text-xs">₹{v.price}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="mt-3 flex items-end gap-2">
-          <span className="text-3xl font-bold">{formatPrice(product.price)}</span>
+          <span className="text-3xl font-bold">{formatPrice(effectivePrice)}</span>
           {pct > 0 && (
             <>
               <span className="text-lg text-muted-foreground line-through">
@@ -231,16 +282,17 @@ export default function ProductDetailPage() {
         <div className="container-app flex items-center gap-3 py-3">
           <QuantityStepper
             value={qty}
+            max={effectiveStock || 0}
             onChange={(v) => setQty(product.id, v)}
           />
           <Button
             fullWidth
             variant="gradient"
             size="lg"
-            disabled={!product.inStock}
+            disabled={!variantInStock}
             onClick={() => {
-              if (qty === 0) addToCart(product, 1);
-              toast({ variant: "success", title: "Added to cart", description: product.name });
+              if (qty === 0) addToCart(variantProduct, 1);
+              toast({ variant: "success", title: "Added to cart", description: variantProduct.name });
               router.push("/cart");
             }}
           >
@@ -250,9 +302,9 @@ export default function ProductDetailPage() {
             fullWidth
             variant="default"
             size="lg"
-            disabled={!product.inStock}
+            disabled={!variantInStock}
             onClick={() => {
-              if (qty === 0) addToCart(product, 1);
+              if (qty === 0) addToCart(variantProduct, 1);
               router.push("/checkout");
             }}
           >
