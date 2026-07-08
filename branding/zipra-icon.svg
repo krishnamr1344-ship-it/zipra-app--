@@ -1,0 +1,46 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="120" x2="904" y2="904" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF9A3D"/>
+      <stop offset="0.55" stop-color="#FF7A00"/>
+      <stop offset="1" stop-color="#F26400"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="320" y1="280" x2="704" y2="744" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FFF3E8"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.32" r="0.7">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Rounded tile -->
+  <rect x="64" y="64" width="896" height="896" rx="232" fill="url(#bg)"/>
+  <rect x="64" y="64" width="896" height="896" rx="232" fill="url(#glow)"/>
+  <rect x="64.5" y="64.5" width="895" height="895" rx="231.5" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="3"/>
+
+  <!-- Zipra mark: leaf-bolt with subtle Z stem -->
+  <g>
+    <!-- main leaf body -->
+    <path d="M512 246
+             C 662 246 760 330 760 470
+             C 760 596 672 700 512 778
+             C 352 700 264 596 264 470
+             C 264 330 362 246 512 246 Z"
+          fill="url(#mark)"/>
+    <!-- central vein / motion swoosh forming a Z -->
+    <path d="M392 392
+             L632 392
+             L432 560
+             L632 560
+             L632 624
+             L392 624
+             L592 456
+             L392 456 Z"
+          fill="#FF7A00"/>
+    <!-- highlight leaf tip -->
+    <path d="M512 246 C 600 248 668 292 712 360 C 648 326 580 312 512 312 C 470 312 432 322 400 340 C 448 286 472 250 512 246 Z"
+          fill="#FFFFFF" fill-opacity="0.55"/>
+  </g>
+</svg>
