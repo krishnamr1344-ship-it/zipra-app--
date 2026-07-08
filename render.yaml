@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: zipra-api
+    env: python
+    buildCommand: bash render-build.sh
+    startCommand: cd backend && gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app
+    envVars:
+      - key: ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: FIREBASE_CREDENTIALS
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://zipra-app.onrender.com

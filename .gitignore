@@ -1,25 +1,31 @@
-# dependencies
-/node_modules
-zipra-mobile/node_modules
+# ──── Dependencies ────
+node_modules/
 /.pnp
 .pnp.js
 
-# testing
+# ──── Testing ────
 /coverage
 
-# next.js
+# ──── Next.js ────
 /.next/
 /out/
 
-# production
+# ──── Production ────
 /build
 
-# misc
-.DS_Store
-*.pem
+# ──── Python ────
+__pycache__/
+*.pyc
+.venv/
+ZipraApp/dist/
+ZipraApp/.bundle/
+ZipraApp/android/.gradle/
+ZipraApp/android/app/build/
 
-# expo / mobile
-zipra-mobile/node_modules/
+# ──── Backend ────
+backend/static/
+
+# ──── Expo / Mobile ────
 zipra-mobile/.expo/
 zipra-mobile/*.jks
 zipra-mobile/*.p8
@@ -28,18 +34,38 @@ zipra-mobile/*.key
 zipra-mobile/*.mobileprovision
 zipra-mobile/*.orig.*
 
-# debug
+# ──── Debug ────
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
+# ──── Env ────
+.env
 .env*.local
 
-# vercel
-.vercel
+# ──── IDE ────
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
 
-# typescript
+# ──── Misc ────
+.DS_Store
+*.pem
+*.class
+*.log
+*.swp
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# ──── Platform ────
+.vercel
 *.tsbuildinfo
 next-env.d.ts
 .opencode
