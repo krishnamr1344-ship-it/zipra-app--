@@ -12,7 +12,7 @@ import firebase_admin
 from firebase_admin import auth as firebase_auth, credentials
 
 from .database import get_db
-from .models import User
+from .models import User, UserRole
 
 logger = logging.getLogger("zipra.auth")
 
@@ -70,7 +70,7 @@ def get_current_user(
     token = authorization[7:]
     try:
         get_firebase_app()
-        decoded = firebase_auth.verify_id_token(token, check_revoked=True)
+        decoded = firebase_auth.verify_id_token(token, check_revoked=False)
         firebase_uid = decoded.get("uid")
     except Exception as e:
         logger.error("Token verification failed: %s", e)
