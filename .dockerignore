@@ -1,7 +1,10 @@
-node_modules
 .git
-.env.local
+.env
 .env*.local
-npm-debug.log
+*.log
 .gitignore
 README.md
+__pycache__
+*.pyc
+venv
+backend/static/uploads

@@ -1,43 +1,13 @@
-# ──── Dependencies ────
-node_modules/
-/.pnp
-.pnp.js
-
-# ──── Testing ────
-/coverage
-
-# ──── Next.js ────
-/.next/
-/out/
-
-# ──── Production ────
-/build
-
 # ──── Python ────
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+venv/
 .venv/
-ZipraApp/dist/
-ZipraApp/.bundle/
-ZipraApp/android/.gradle/
-ZipraApp/android/app/build/
 
 # ──── Backend ────
-backend/static/
-
-# ──── Expo / Mobile ────
-zipra-mobile/.expo/
-zipra-mobile/*.jks
-zipra-mobile/*.p8
-zipra-mobile/*.p12
-zipra-mobile/*.key
-zipra-mobile/*.mobileprovision
-zipra-mobile/*.orig.*
-
-# ──── Debug ────
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+backend/static/uploads/
+backend/venv/
 
 # ──── Env ────
 .env
@@ -46,26 +16,15 @@ yarn-error.log*
 # ──── IDE ────
 .idea/
 *.iml
-*.ipr
-*.iws
 .vscode/
 
 # ──── Misc ────
 .DS_Store
-*.pem
-*.class
 *.log
 *.swp
-.atom/
 .build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
 migrate_working_dir/
 
 # ──── Platform ────
-.vercel
-*.tsbuildinfo
-next-env.d.ts
 .opencode
+*.tsbuildinfo

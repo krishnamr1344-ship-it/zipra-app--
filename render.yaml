@@ -16,4 +16,4 @@ services:
       - key: FIREBASE_CREDENTIALS
         sync: false
       - key: CORS_ORIGINS
-        value: https://zipra-app.onrender.com
+        value: "*"

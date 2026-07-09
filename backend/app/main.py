@@ -1,12 +1,11 @@
 import json
 import logging
 import os
-from pathlib import Path
 
 import httpx
 from fastapi import Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -149,16 +148,4 @@ def health(db: Session = Depends(get_db)):
     return JSONResponse(status_code=code, content={"status": status, "app": "Zipra API", "database": "connected" if db_ok else "down"})
 
 
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
-if STATIC_DIR.exists():
-
-    @app.get("/{full_path:path}")
-    async def serve_frontend(full_path: str):
-        file_path = STATIC_DIR / full_path
-        if file_path.is_file():
-            return FileResponse(str(file_path))
-        index = STATIC_DIR / "index.html"
-        if index.exists():
-            return FileResponse(str(index), media_type="text/html")
-        return JSONResponse(status_code=404, content={"detail": "Not found"})
